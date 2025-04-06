@@ -21,3 +21,4 @@ mysql-connector-python
 google-auth
 cloud-sql-python-connector
 pymysql
+pyodbc

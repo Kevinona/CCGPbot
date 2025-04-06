@@ -32,6 +32,7 @@ jobs:
         push: true
         tags: mcr.microsoft.com/${{ secrets.USER_NAME }}/appsvc/staticsite:${{ github.sha }}
         file: ./Dockerfile
+        context: .
 
   deploy:
     runs-on: ubuntu-latest
