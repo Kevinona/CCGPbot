@@ -16,3 +16,8 @@ tornado==6.4.2
 tzlocal==5.3
 urllib3==1.26.18
 wheel==0.45.1
+telethon
+mysql-connector-python
+google-auth
+cloud-sql-python-connector
+pymysql
