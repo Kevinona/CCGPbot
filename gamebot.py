@@ -3,7 +3,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, ConversationHandler
 import random
 import string
-from utils.constants import *  # 导入常量
+import os
+from utils.constants import *
 from games.ttt import start_tictactoe_game, handle_ttt_move
 from games.bj import start_blackjack_game, handle_blackjack_action
 from games.go import start_go_game, handle_go_move
@@ -537,7 +538,7 @@ def handle_record_command(update: Update, context: CallbackContext):
 
 def main() -> None:
     """启动机器人"""
-    updater = Updater(token=TOKEN)
+    updater = Updater(token=os.environ['GAMEBOT_TOKEN'])
     dispatcher = updater.dispatcher
 
     # 修改 ConversationHandler，添加过滤规则，避免处理以特定前缀开头的回调数据

@@ -1,4 +1,6 @@
 import logging
+import os
+
 # 启用日志记录
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -7,27 +9,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class HKBU_ChatGPT:
-    '''
-    def __init__(self, config_='./config.ini'):
-        if type(config_) == str:
-            self.config = configparser.ConfigParser()
-            self.config.read(config_)
-        elif type(config_) == configparser.ConfigParser:
-            self.config = config_
-    '''
-
     def submit(self, message):
         import requests
         conversation = [{"role": "user", "content": message}]
 
-        url = (('https://genai.hkbu.edu.hk/general/rest') 
+        url = ((os.environ['GPT_URL']) 
                + "/deployments/" 
-               + ('gpt-4-o-mini')
+               + (os.environ['GPT_MODELNAME'])
                + "/chat/completions/?api-version="
-               + ('2024-05-01-preview'))
+               + (os.environ['GPT_APIVERSION']))
         
         headers = {'Conteent-Type': 'application/json',
-                   'api-key': ('7f35c371-9f67-4fc8-9e16-f4a72452f8c0'),}
+                   'api-key': (os.environ['GPT_TOKEN']),}
         playload = {"messages": conversation}
         response = requests.post(url, json=playload, headers=headers)
         if response.status_code == 200:
@@ -36,21 +29,11 @@ class HKBU_ChatGPT:
         else:
             return 'Error: ', response
 
-# 请将下面的 TOKEN 替换为您从 BotFather 获取的令牌
-TOKEN = "7701763268:AAEuSw1_APH1i-kvWbR50Ac8GlcIf9L9n_c"
-BOT_TOKEN = "7867556837:AAEUxpKaz1jMdRt90E3Xo6lDZ0VrtRa84Eg"
 
 # 群组邀请链接
 GAME_GROUP = "https://t.me/+UCuqOkw1md9kZTRl"
 TRAVEL_GROUP = "https://t.me/+Hxk2dIl2qwI4Yzg1"
 
-# 替换为你的 API ID 和 API Hash
-api_id = '###'
-api_hash = '###'
-
-# 替换为你的 Telegram 手机号
-phone_number = '###'
-password = '###'
 
 # 游戏状态
 SELECTING_GAME, GAME_ACTION = range(2)

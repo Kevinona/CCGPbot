@@ -1,39 +1,29 @@
-# filepath: /workspaces/CCGPbot/database.py
-
 import pyodbc
-
-# 替换为你的数据库连接信息
-server = 'tcp:ccgp.database.windows.net,1433'  # 服务器名称或 IP 地址
-database = 'ccgpsql'  # 数据库名称
-username = 'ccgpsql'  # 用户名
-password = 'Groupproject1'  # 密码
+import os
 
 try:
-    # 创建连接字符串
-    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password}"
+    # create connection string using environment variables
+    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={os.environ['DB_server']};DATABASE={os.environ['DB_database']};UID={os.environ['DB_username']};PWD={os.envrion['DB_password']}"
     conn = pyodbc.connect(connection_string)
-    print("成功连接到数据库！")
+    print("connected to database")
     conn.close()
 except Exception as e:
-    print(f"连接失败: {e}")
+    print(f"database connect fail: {e}")
 
 def update_user_record(user_id, username, game_name, result):
     """
-    更新用户的输赢平记录。
-    :param user_id: 用户 ID
-    :param username: 用户名
-    :param game_name: 游戏名称
-    :param result: 比赛结果 ('win', 'loss', 'draw')
+    update or insert user game record.
+    result: ('win', 'loss', 'draw')
     """
     try:
         conn = pyodbc.connect(connection_string)
         cursor = conn.cursor()
 
-        # 确保 user_id 和 username 是字符串
+        # make sure user_id and username are string
         user_id = str(user_id)
         username = str(username)
 
-        # 检查记录是否存在
+        # check if the user_id and game_name already exist
         cursor.execute("""
             SELECT wins, losses, draws FROM UserGameRecords
             WHERE user_id = ? AND game_name = ?
@@ -41,7 +31,7 @@ def update_user_record(user_id, username, game_name, result):
         record = cursor.fetchone()
 
         if record:
-            # 更新记录
+            # update existing record
             if result == 'win':
                 cursor.execute("""
                     UPDATE UserGameRecords
@@ -61,7 +51,7 @@ def update_user_record(user_id, username, game_name, result):
                     WHERE user_id = ? AND game_name = ?
                 """, (username, user_id, game_name))
         else:
-            # 插入新记录
+            # insert new record
             wins, losses, draws = 0, 0, 0
             if result == 'win':
                 wins = 1
