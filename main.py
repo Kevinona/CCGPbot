@@ -27,7 +27,7 @@ def start_health_check_server():
 def main():
     # Start health check server in a separate thread
     health_check_thread = threading.Thread(target=start_health_check_server, daemon=True)
-    health_check_thread.start()
+    
 
     # create two processes to run sbot and gamebot
     sbot_process = Process(target=sbot_main, args=(TRAVEL_GROUP, GAME_GROUP))
@@ -38,6 +38,7 @@ def main():
     sbot_process.start()
     gamebot_process.start()
     chatbot_process.start()
+    health_check_thread.start()
 
     # wait for the processes to finish
     sbot_process.join()
