@@ -5,7 +5,6 @@ from chatbot import main as chatbot_main
 from utils.constants import *
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import os
-import threading
 
 def start_health_check_server():
     """Start a simple HTTP server for Azure health checks."""
@@ -26,8 +25,7 @@ def start_health_check_server():
 
 def main():
     # Start health check server in a separate thread
-    health_check_thread = threading.Thread(target=start_health_check_server, daemon=True)
-    
+    health_check_thread = Process(target=start_health_check_server, daemon=True)
 
     # create two processes to run sbot and gamebot
     sbot_process = Process(target=sbot_main, args=(TRAVEL_GROUP, GAME_GROUP))
