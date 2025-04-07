@@ -42,7 +42,7 @@ def main():
     sbot_process.join()
     gamebot_process.join()
     chatbot_process.join()
-
+    health_check_thread.join()
 
 if __name__ == "__main__":
     main()
