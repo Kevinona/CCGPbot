@@ -3,7 +3,7 @@ import os
 
 try:
     # create connection string using environment variables
-    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={os.environ['DB_server']};DATABASE={os.environ['DB_database']};UID={os.environ['DB_username']};PWD={os.envrion['DB_password']}"
+    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={os.environ['DB_server']};DATABASE={os.environ['DB_database']};UID={os.environ['DB_username']};PWD={os.environ['DB_password']}"
     conn = pyodbc.connect(connection_string)
     print("connected to database")
     conn.close()

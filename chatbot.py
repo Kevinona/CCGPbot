@@ -9,14 +9,14 @@ def handle_start_command(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(
         "Welcome to the Travel Planning Consultation Bot!\n\n"
         "I am your travel assistant, here to provide you with travel plans, travel guides, and attraction recommendations.\n"
-        "You can communicate with me by sending the /travelbot command, for example:\n"
-        "/travelbot Recommend some tourist attractions in Paris\n\n"
+        "You can communicate with me by sending the /gpt command, for example:\n"
+        "/gpt Recommend some tourist attractions in Paris\n\n"
         "Looking forward to assisting you!"
     )
 
 
 def handle_gpt_command(update: Update, context: CallbackContext) -> None:
-    """Handle /travelbot command"""
+    """Handle /gpt command"""
     chatgpt = HKBU_ChatGPT()
     if context.args:
         # dynamically add role prompt
