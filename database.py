@@ -1,21 +1,13 @@
 import pyodbc
 import os
 
-try:
-    # create connection string using environment variables
-    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={os.environ['DB_server']};DATABASE={os.environ['DB_database']};UID={os.environ['DB_username']};PWD={os.environ['DB_password']}"
-    conn = pyodbc.connect(connection_string)
-    print("connected to database")
-    conn.close()
-except Exception as e:
-    print(f"database connect fail: {e}")
-
-
 def update_user_record(user_id, username, game_name, result):
     """
     update or insert user game record.
     result: ('win', 'loss', 'draw')
     """
+    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={os.environ['DB_server']};DATABASE={os.environ['DB_database']};UID={os.environ['DB_username']};PWD={os.environ['DB_password']}"
+    conn = pyodbc.connect(connection_string)
     try:
         conn = pyodbc.connect(connection_string)
         cursor = conn.cursor()
@@ -78,6 +70,8 @@ def get_user_record(user_id):
     """
     Query the user's win/loss/draw records.
     """
+    connection_string = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={os.environ['DB_server']};DATABASE={os.environ['DB_database']};UID={os.environ['DB_username']};PWD={os.environ['DB_password']}"
+    conn = pyodbc.connect(connection_string)
     try:
         conn = pyodbc.connect(connection_string)
         cursor = conn.cursor()
@@ -96,7 +90,7 @@ def get_user_record(user_id):
             # Construct return message
             message = f"Game records for user {records[0][0]}:\n"
             for record in records:
-                game_name, wins, losses, draws = record
+                username, game_name, wins, losses, draws = record
                 message += f"Game: {game_name}\nWins: {wins}, Losses: {losses}, Draws: {draws}\n\n"
             return message
         else:
