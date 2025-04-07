@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from multiprocessing import Process
 from sbot import main as sbot_main
 from gamebot import main as gamebot_main
@@ -20,6 +19,7 @@ def main():
     sbot_process.join()
     gamebot_process.join()
     chatbot_process.join()
+
 
 if __name__ == "__main__":
     main()

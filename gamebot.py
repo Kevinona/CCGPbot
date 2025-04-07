@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, ConversationHandler
 import random
@@ -12,32 +11,33 @@ from games.spy import start_spy_game, handle_spy_discussion, handle_spy_vote, sa
 from database import get_user_record
 
 def generate_room_id():
-    """生成一个随机6位房间ID"""
+    """Generate a random 6-character room ID"""
     while True:
         room_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        # 确保房间ID唯一
+        # ensure the room ID is unique
         if all(room_id not in rooms for rooms in active_rooms.values()):
             return room_id
 
+
 def start(update: Update, context: CallbackContext) -> int:
-    """处理 /start 命令或返回主菜单的操作，显示游戏选择界面"""
+    """Handle /start command or return to the main menu"""
     user = update.effective_user
     keyboard = [
-        [InlineKeyboardButton("井字棋", callback_data=TIC_TAC_TOE)],
-        [InlineKeyboardButton("围棋", callback_data=GO)],
-        [InlineKeyboardButton("谁是卧底", callback_data=WHO_IS_SPY)],
-        [InlineKeyboardButton("21点", callback_data=BLACKJACK)]
+        [InlineKeyboardButton("Tic Tac Toe", callback_data=TIC_TAC_TOE)],
+        [InlineKeyboardButton("Go", callback_data=GO)],
+        [InlineKeyboardButton("Who is the Spy", callback_data=WHO_IS_SPY)],
+        [InlineKeyboardButton("Blackjack", callback_data=BLACKJACK)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     text = (
-        f"你好 {user.first_name}，欢迎使用游戏机器人！\n"
-        "请选择想要玩的游戏：\n\n"
-        "你还可以使用以下命令：\n"
-        "/record - 查询你的游戏输赢平记录\n"
-        "/rooms - 查看当前活跃的游戏房间\n"
-        "/join <房间ID> - 加入指定房间\n"
-        "/cancel - 取消当前操作"
+        f"Hello {user.first_name}, welcome to the Game Bot!\n"
+        "Please select a game to play:\n\n"
+        "You can also use the following commands:\n"
+        "/record - Check your game win/loss/draw record\n"
+        "/rooms - View active game rooms\n"
+        "/join <Room ID> - Join a specific room\n"
+        "/cancel - Cancel the current operation"
     )
     
     if update.message:
@@ -45,24 +45,24 @@ def start(update: Update, context: CallbackContext) -> int:
     elif update.callback_query:
         update.callback_query.edit_message_text(text, reply_markup=reply_markup)
     else:
-        logger.error("无法获取消息来源")
+        logger.error("Unable to determine the message source")
     
     return SELECTING_GAME
 
 
 def get_game_name(game_type):
-    """安全地获取游戏名称，避免KeyError"""
-    return game_names.get(game_type, "未知游戏")
+    """Safely get the game name to avoid KeyError"""
+    return game_names.get(game_type, "Unknown Game")
 
 
 def game_selection(update: Update, context: CallbackContext) -> int:
-    """处理游戏选择后的操作"""
+    """Handle actions after game selection"""
     query = update.callback_query
     query.answer()
     
     game_type = query.data
     
-    # 如果回调数据为特殊操作，则交给 game_action 处理
+    # handle special actions
     if game_type in [CREATE_GAME, MATCH_PLAYER, PLAY_WITH_GPT, CANCEL_MATCH] or game_type.startswith(("start_game_", "cancel_room_", "end_game_")):
         return game_action(update, context)
     
@@ -73,28 +73,28 @@ def game_selection(update: Update, context: CallbackContext) -> int:
 
     if game_type in [TIC_TAC_TOE, GO, BLACKJACK]:
         keyboard = [
-            [InlineKeyboardButton("创建对局", callback_data=CREATE_GAME)],
-            [InlineKeyboardButton("匹配玩家", callback_data=MATCH_PLAYER)],
-            [InlineKeyboardButton("与GPT对战", callback_data=PLAY_WITH_GPT)],
-            [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+            [InlineKeyboardButton("Create Game", callback_data=CREATE_GAME)],
+            [InlineKeyboardButton("Match Player", callback_data=MATCH_PLAYER)],
+            [InlineKeyboardButton("Play with GPT", callback_data=PLAY_WITH_GPT)],
+            [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
         ]
     else:
         keyboard = [
-            [InlineKeyboardButton("创建对局", callback_data=CREATE_GAME)],
-            [InlineKeyboardButton("匹配玩家", callback_data=MATCH_PLAYER)],
-            [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+            [InlineKeyboardButton("Create Game", callback_data=CREATE_GAME)],
+            [InlineKeyboardButton("Match Player", callback_data=MATCH_PLAYER)],
+            [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
         ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(
-        f"你选择了 {get_game_name(game_type)}，请选择操作：",
+        f"You selected {get_game_name(game_type)}. Please choose an action:",
         reply_markup=reply_markup
     )
     return GAME_ACTION
 
 
 def game_action(update: Update, context: CallbackContext) -> int:
-    """处理选择具体游戏操作后的逻辑"""
+    """Handle logic after selecting a specific game action"""
     query = update.callback_query
     query.answer()
     
@@ -103,18 +103,18 @@ def game_action(update: Update, context: CallbackContext) -> int:
     if action == BACK_TO_MAIN:
         return start(update, context)
     
-    # 获取游戏类型，可能从user_data中获取或者就是当前的action（如create_game）
+    # get game type from user_data or action
     game_type = context.user_data.get("game_type")
     
-    # 如果action是CREATE_GAME, MATCH_PLAYER等，但没有game_type，则返回主菜单
+    # if action is CREATE_GAME, MATCH_PLAYER, etc., but no game_type, return to main menu
     if action in [CREATE_GAME, MATCH_PLAYER, PLAY_WITH_GPT] and not game_type:
-        logger.error(f"游戏类型未定义，action={action}")
+        logger.error(f"Game type not defined, action={action}")
         return start(update, context)
     
     user_id = update.effective_user.id
     username = update.effective_user.username or update.effective_user.first_name
     
-    # 如果用户在匹配队列中，且选择创建游戏，先将其从匹配队列中移除
+    # remove user from waiting list if creating a game
     if action == CREATE_GAME and game_type and user_id in waiting_players.get(game_type, []):
         waiting_players[game_type].remove(user_id)
     
@@ -128,19 +128,19 @@ def game_action(update: Update, context: CallbackContext) -> int:
             "status": "waiting"
         }
         keyboard = [
-            [InlineKeyboardButton("开始游戏", callback_data=f"start_game_{room_id}")],
-            [InlineKeyboardButton("取消房间", callback_data=f"cancel_room_{room_id}")],
-            [InlineKeyboardButton("邀请朋友加入", url=f"https://t.me/share/url?url=加入我的{get_game_name(game_type)}游戏房间！房间ID：{room_id}")],
-            [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+            [InlineKeyboardButton("Start Game", callback_data=f"start_game_{room_id}")],
+            [InlineKeyboardButton("Cancel Room", callback_data=f"cancel_room_{room_id}")],
+            [InlineKeyboardButton("Invite Friends", url=f"https://t.me/share/url?url=Join my {get_game_name(game_type)} game room! Room ID: {room_id}")],
+            [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text(
-            f"你已成功创建一个{get_game_name(game_type)}游戏房间！\n房间ID: {room_id}\n将此ID分享给朋友，他们可以使用 /join {room_id} 加入你的房间。\n\n当前玩家：\n1. {username} (房主)",
+            f"You have successfully created a {get_game_name(game_type)} game room!\nRoom ID: {room_id}\nShare this ID with friends, they can join your room using /join {room_id}.\n\nCurrent players:\n1. {username} (Host)",
             reply_markup=reply_markup
         )
         
     elif action == MATCH_PLAYER:
-        # 先检查是否有可用的等待中的房间
+        # check for available waiting rooms
         available_room = None
         for room_id, room in active_rooms[game_type].items():
             if room["status"] == "waiting" and len(room["players"]) < (8 if game_type == WHO_IS_SPY else 2):
@@ -148,57 +148,57 @@ def game_action(update: Update, context: CallbackContext) -> int:
                 break
                 
         if available_room:
-            # 如果有可用房间，加入该房间
+            # join available room
             room_id, room = available_room
             if user_id not in room["players"]:
                 room["players"].append(user_id)
                 room["player_names"].append(username)
                 
-                # 通知房主有新玩家加入
+                # notify host of new player
                 try:
                     host_keyboard = [
-                        [InlineKeyboardButton("开始游戏", callback_data=f"start_game_{room_id}")],
-                        [InlineKeyboardButton("取消房间", callback_data=f"cancel_room_{room_id}")],
-                        [InlineKeyboardButton("邀请朋友加入", url=f"https://t.me/share/url?url=加入我的{get_game_name(game_type)}游戏房间！房间ID：{room_id}")],
-                        [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                        [InlineKeyboardButton("Start Game", callback_data=f"start_game_{room_id}")],
+                        [InlineKeyboardButton("Cancel Room", callback_data=f"cancel_room_{room_id}")],
+                        [InlineKeyboardButton("Invite Friends", url=f"https://t.me/share/url?url=Join my {get_game_name(game_type)} game room! Room ID: {room_id}")],
+                        [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                     ]
                     host_markup = InlineKeyboardMarkup(host_keyboard)
                     
                     context.bot.send_message(
                         chat_id=room["host"],
-                        text=f"新玩家 {username} 加入了你的房间！\n\n游戏：{get_game_name(game_type)}\n房间ID：{room_id}",
+                        text=f"New player {username} has joined your room!\n\nGame: {get_game_name(game_type)}\nRoom ID: {room_id}",
                         reply_markup=host_markup
                     )
                 except Exception as e:
-                    logger.error(f"无法发送消息给房主 {room['host']}：{e}")
+                    logger.error(f"Failed to send message to host {room['host']}: {e}")
                 
                 player_keyboard = [
-                    [InlineKeyboardButton("邀请朋友加入", url=f"https://t.me/share/url?url=加入我的{get_game_name(game_type)}游戏房间！房间ID：{room_id}")],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("Invite Friends", url=f"https://t.me/share/url?url=Join my {get_game_name(game_type)} game room! Room ID: {room_id}")],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
                 player_markup = InlineKeyboardMarkup(player_keyboard)
                 
-                # 通知当前玩家已成功加入房间
+                # notify current player of successful join
                 query.edit_message_text(
-                    f"你已成功加入房间 {room_id}！\n游戏：{get_game_name(game_type)}\n房主：{room.get('host_name', '未知')}",
+                    f"You have successfully joined room {room_id}!\nGame: {get_game_name(game_type)}\nHost: {room.get('host_name', 'Unknown')}",
                     reply_markup=player_markup
                 )
             else:
                 query.edit_message_text(
-                    f"你已经在房间 {room_id} 中了！",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                    f"You are already in room {room_id}!",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]])
                 )
         elif waiting_players[game_type] and waiting_players[game_type][0] != user_id:
             matched_player_id = waiting_players[game_type].pop(0)
             
-            # 获取匹配到的玩家的用户名
+            # get matched player's username
             matched_player_name = None
             try:
                 matched_player = context.bot.get_chat(matched_player_id)
                 matched_player_name = matched_player.username or matched_player.first_name
             except Exception as e:
-                logger.error(f"无法获取玩家 {matched_player_id} 的信息：{e}")
-                matched_player_name = "未知玩家"
+                logger.error(f"Failed to get info for player {matched_player_id}: {e}")
+                matched_player_name = "Unknown Player"
             
             room_id = generate_room_id()
             active_rooms[game_type][room_id] = {
@@ -209,58 +209,58 @@ def game_action(update: Update, context: CallbackContext) -> int:
                 "status": "matched"
             }
             
-            # 通知被匹配的玩家
+            # notify matched player
             try:
-                keyboard_for_matched = [[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]]
+                keyboard_for_matched = [[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]]
                 markup_for_matched = InlineKeyboardMarkup(keyboard_for_matched)
                 context.bot.send_message(
                     chat_id=matched_player_id,
-                    text=f"已匹配到对手 {username}！\n游戏：{get_game_name(game_type)}\n房间ID：{room_id}\n游戏即将开始...",
+                    text=f"You have been matched with {username}!\nGame: {get_game_name(game_type)}\nRoom ID: {room_id}\nThe game will start soon...",
                     reply_markup=markup_for_matched
                 )
             except Exception as e:
-                logger.error(f"无法发送消息给玩家 {matched_player_id}：{e}")
+                logger.error(f"Failed to send message to player {matched_player_id}: {e}")
             
-            # 当前玩家的界面
+            # current player's interface
             keyboard = [
-                [InlineKeyboardButton("开始游戏", callback_data=f"start_game_{room_id}")],
-                [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                [InlineKeyboardButton("Start Game", callback_data=f"start_game_{room_id}")],
+                [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            # 发送消息给当前玩家
+            # send message to current player
             try:
                 query.edit_message_text(
-                    text=f"已匹配到对手 {matched_player_name}！\n游戏：{get_game_name(game_type)}\n房间ID：{room_id}\n点击开始游戏按钮开始对局！",
+                    text=f"You have been matched with {matched_player_name}!\nGame: {get_game_name(game_type)}\nRoom ID: {room_id}\nClick the Start Game button to begin!",
                     reply_markup=reply_markup
                 )
             except Exception as e:
-                logger.error(f"编辑消息失败：{e}")
+                logger.error(f"Failed to edit message: {e}")
         else:
-            # 确保用户被添加到等待列表中
+            # add user to waiting list
             if user_id not in waiting_players[game_type]:
                 waiting_players[game_type].append(user_id)
                 
-            # 如果没有可用房间，也没有等待匹配的玩家，则提示用户创建房间
-            if len(waiting_players[game_type]) == 1:  # 只有当前用户在等待
+            # if no available rooms or waiting players, prompt user to create a room
+            if len(waiting_players[game_type]) == 1:  # Only current user is waiting
                 keyboard = [
-                    [InlineKeyboardButton("创建房间", callback_data=CREATE_GAME)],
-                    [InlineKeyboardButton("取消匹配", callback_data=CANCEL_MATCH)],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("Create Room", callback_data=CREATE_GAME)],
+                    [InlineKeyboardButton("Cancel Match", callback_data=CANCEL_MATCH)],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 query.edit_message_text(
-                    f"当前没有可加入的{get_game_name(game_type)}房间，也没有其他等待匹配的玩家。\n你可以创建一个新房间或继续等待其他玩家。",
+                    f"There are no available {get_game_name(game_type)} rooms or waiting players.\nYou can create a new room or wait for other players.",
                     reply_markup=reply_markup
                 )
             else:
                 keyboard = [
-                    [InlineKeyboardButton("取消匹配", callback_data=CANCEL_MATCH)],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("Cancel Match", callback_data=CANCEL_MATCH)],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 query.edit_message_text(
-                    f"正在为你匹配{get_game_name(game_type)}的对手...\n请稍候，当有玩家加入时会通知你。",
+                    f"Matching you with an opponent for {get_game_name(game_type)}...\nPlease wait, you will be notified when a player joins.",
                     reply_markup=reply_markup
                 )
     
@@ -276,24 +276,24 @@ def game_action(update: Update, context: CallbackContext) -> int:
                 "gpt_state": {}
             }
             
-            # 只为井字棋添加先手/后手选择
+            # add first/second move choice for Tic Tac Toe
             if game_type == TIC_TAC_TOE:
                 keyboard = [
-                    [InlineKeyboardButton("我先手 (X)", callback_data=f"start_game_{room_id}")],
-                    [InlineKeyboardButton("GPT先手 (O)", callback_data=f"gpt_first_{room_id}")],
-                    [InlineKeyboardButton("取消房间", callback_data=f"cancel_room_{room_id}")],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("I go first (X)", callback_data=f"start_game_{room_id}")],
+                    [InlineKeyboardButton("GPT goes first (O)", callback_data=f"gpt_first_{room_id}")],
+                    [InlineKeyboardButton("Cancel Room", callback_data=f"cancel_room_{room_id}")],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
             else:
                 keyboard = [
-                    [InlineKeyboardButton("开始游戏", callback_data=f"start_game_{room_id}")],
-                    [InlineKeyboardButton("取消房间", callback_data=f"cancel_room_{room_id}")],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("Start Game", callback_data=f"start_game_{room_id}")],
+                    [InlineKeyboardButton("Cancel Room", callback_data=f"cancel_room_{room_id}")],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
                 
             reply_markup = InlineKeyboardMarkup(keyboard)
             query.edit_message_text(
-                f"你已开始与GPT的{get_game_name(game_type)}对局！\n房间ID: {room_id}\n\n当前玩家：\n1. {username} (房主)\n2. GPT AI",
+                f"You have started a {get_game_name(game_type)} game with GPT!\nRoom ID: {room_id}\n\nCurrent players:\n1. {username} (Host)\n2. GPT AI",
                 reply_markup=reply_markup
             )
     
@@ -302,7 +302,7 @@ def game_action(update: Update, context: CallbackContext) -> int:
             waiting_players[game_type].remove(user_id)
         return start(update, context)
     
-    # 处理开始游戏操作
+    # starting a game
     elif action.startswith("start_game_"):
         room_id = action.split("_")[-1]
         for game, rooms in active_rooms.items():
@@ -322,16 +322,16 @@ def game_action(update: Update, context: CallbackContext) -> int:
                     start_spy_game(update, context, room_id, room)
                     return SELECTING_GAME
                 else:
-                    player_list = "\n".join([f"{i+1}. {name}{' (房主)' if room['host'] == pid else ''}" 
+                    player_list = "\n".join([f"{i+1}. {name}{' (Host)' if room['host'] == pid else ''}" 
                                        for i, (name, pid) in enumerate(zip(room["player_names"], room["players"]))])
                     keyboard = [
-                        [InlineKeyboardButton("结束游戏", callback_data=f"end_game_{room_id}")],
-                        [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                        [InlineKeyboardButton("End Game", callback_data=f"end_game_{room_id}")],
+                        [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     query.edit_message_text(
-                        f"游戏已开始！\n游戏：{get_game_name(game)}\n房间ID：{room_id}\n\n参与玩家：\n{player_list}\n\n（游戏逻辑未实现）",
+                        f"The game has started!\nGame: {get_game_name(game)}\nRoom ID: {room_id}\n\nPlayers:\n{player_list}\n\n(Game logic not implemented)",
                         reply_markup=reply_markup
                     )
                     
@@ -342,20 +342,20 @@ def game_action(update: Update, context: CallbackContext) -> int:
                             try:
                                 context.bot.send_message(
                                     chat_id=player_id,
-                                    text=f"游戏已开始！\n游戏：{get_game_name(game)}\n房间ID：{room_id}\n\n参与玩家：\n{player_list}\n\n（游戏逻辑未实现）",
-                                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                                    text=f"The game has started!\nGame: {get_game_name(game)}\nRoom ID: {room_id}\n\nPlayers:\n{player_list}\n\n(Game logic not implemented)",
+                                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]])
                                 )
                             except Exception as e:
-                                logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+                                logger.error(f"Failed to send message to player {player_id}: {e}")
                     return SELECTING_GAME
                     
-    # 处理GPT先手操作
+    # GPT first move
     elif action.startswith("gpt_first_"):
         room_id = action.split("_")[-1]
         room = active_rooms[TIC_TAC_TOE].get(room_id)
         if room and room["host"] == user_id:
             room["status"] = "playing"
-            # 将当前回合设置为非房主（即GPT），让GPT先手
+            # set current turn to GPT
             room["current_turn"] = "GPT"
             start_tictactoe_game(update, context, room_id, room)
             return SELECTING_GAME
@@ -372,15 +372,15 @@ def game_action(update: Update, context: CallbackContext) -> int:
                         try:
                             context.bot.send_message(
                                 chat_id=player_id,
-                                text=f"房主已取消房间 {room_id}。",
-                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                                text=f"The host has canceled room {room_id}.",
+                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]])
                             )
                         except Exception as e:
-                            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+                            logger.error(f"Failed to send message to player {player_id}: {e}")
                 del rooms[room_id]
                 query.edit_message_text(
-                    f"你已成功取消房间 {room_id}。",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                    f"You have successfully canceled room {room_id}.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]])
                 )
                 return SELECTING_GAME
     
@@ -396,28 +396,25 @@ def game_action(update: Update, context: CallbackContext) -> int:
                         try:
                             context.bot.send_message(
                                 chat_id=player_id,
-                                text=f"房主已结束游戏。房间 {room_id} 已关闭。",
-                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                                text=f"The host has ended the game. Room {room_id} is now closed.",
+                                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]])
                             )
                         except Exception as e:
-                            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+                            logger.error(f"Failed to send message to player {player_id}: {e}")
                 del rooms[room_id]
                 query.edit_message_text(
-                    f"游戏已结束！房间 {room_id} 已关闭。",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                    f"The game has ended! Room {room_id} is now closed.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]])
                 )
                 return SELECTING_GAME
     
     return SELECTING_GAME
 
 
-
-
-
 def join_room(update: Update, context: CallbackContext) -> None:
-    """处理 /join 命令，加入指定房间"""
+    """Handle /join command to join a specific room"""
     if not context.args:
-        update.message.reply_text("请提供房间ID，例如：/join ABC123")
+        update.message.reply_text("Please provide a room ID, e.g., /join ABC123")
         return
 
     room_id = context.args[0].upper()
@@ -428,14 +425,14 @@ def join_room(update: Update, context: CallbackContext) -> None:
         if room_id in rooms:
             room = rooms[room_id]
             if room["status"] == "playing":
-                update.message.reply_text("抱歉，该房间的游戏已经开始，无法加入。")
+                update.message.reply_text("Sorry, the game in this room has already started.")
                 return
                 
             if game_type == WHO_IS_SPY and len(room["players"]) >= 8:
-                update.message.reply_text("抱歉，该房间已满员（最多8人）。")
+                update.message.reply_text("Sorry, the room is full (maximum 8 players).")
                 return
             elif game_type != WHO_IS_SPY and len(room["players"]) >= 2:
-                update.message.reply_text("抱歉，该房间已满员。")
+                update.message.reply_text("Sorry, the room is full.")
                 return
             
             is_new_player = False
@@ -444,21 +441,21 @@ def join_room(update: Update, context: CallbackContext) -> None:
                 room["player_names"].append(username)
                 is_new_player = True
             
-            player_list = "\n".join([f"{i+1}. {name}{' (房主)' if room['host'] == pid else ''}" 
+            player_list = "\n".join([f"{i+1}. {name}{' (Host)' if room['host'] == pid else ''}" 
                                    for i, (name, pid) in enumerate(zip(room["player_names"], room["players"]))])
             
             if is_new_player:
                 host_keyboard = [
-                    [InlineKeyboardButton("开始游戏", callback_data=f"start_game_{room_id}")],
-                    [InlineKeyboardButton("取消房间", callback_data=f"cancel_room_{room_id}")],
-                    [InlineKeyboardButton("邀请朋友加入", url=f"https://t.me/share/url?url=加入我的{get_game_name(game_type)}游戏房间！房间ID：{room_id}")],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("Start Game", callback_data=f"start_game_{room_id}")],
+                    [InlineKeyboardButton("Cancel Room", callback_data=f"cancel_room_{room_id}")],
+                    [InlineKeyboardButton("Invite Friends", url=f"https://t.me/share/url?url=Join my {get_game_name(game_type)} game room! Room ID: {room_id}")],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
                 host_markup = InlineKeyboardMarkup(host_keyboard)
                 
                 player_keyboard = [
-                    [InlineKeyboardButton("邀请朋友加入", url=f"https://t.me/share/url?url=加入我的{get_game_name(game_type)}游戏房间！房间ID：{room_id}")],
-                    [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                    [InlineKeyboardButton("Invite Friends", url=f"https://t.me/share/url?url=Join my {get_game_name(game_type)} game room! Room ID: {room_id}")],
+                    [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
                 ]
                 player_markup = InlineKeyboardMarkup(player_keyboard)
                 
@@ -469,79 +466,78 @@ def join_room(update: Update, context: CallbackContext) -> None:
                         if player_id == room["host"]:
                             context.bot.send_message(
                                 chat_id=player_id,
-                                text=f"新玩家 {username} 加入了你的房间！\n\n游戏：{get_game_name(game_type)}\n房间ID：{room_id}\n\n当前玩家：\n{player_list}",
+                                text=f"New player {username} has joined your room!\n\nGame: {get_game_name(game_type)}\nRoom ID: {room_id}\n\nCurrent players:\n{player_list}",
                                 reply_markup=host_markup
                             )
                         elif player_id != user_id:
                             context.bot.send_message(
                                 chat_id=player_id,
-                                text=f"新玩家 {username} 加入了房间！\n\n游戏：{get_game_name(game_type)}\n房间ID：{room_id}\n\n当前玩家：\n{player_list}",
+                                text=f"New player {username} has joined the room!\n\nGame: {get_game_name(game_type)}\nRoom ID: {room_id}\n\nCurrent players:\n{player_list}",
                                 reply_markup=player_markup
                             )
                     except Exception as e:
-                        logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+                        logger.error(f"Failed to send message to player {player_id}: {e}")
             
             player_keyboard = [
-                [InlineKeyboardButton("邀请朋友加入", url=f"https://t.me/share/url?url=加入我的{get_game_name(game_type)}游戏房间！房间ID：{room_id}")],
-                [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                [InlineKeyboardButton("Invite Friends", url=f"https://t.me/share/url?url=Join my {get_game_name(game_type)} game room! Room ID: {room_id}")],
+                [InlineKeyboardButton("Back to Main Menu", callback_data=BACK_TO_MAIN)]
             ]
             player_markup = InlineKeyboardMarkup(player_keyboard)
             
-            join_message = "你已成功加入房间" if is_new_player else "你已在房间中"
+            join_message = "You have successfully joined the room" if is_new_player else "You are already in the room"
             update.message.reply_text(
-                f"{join_message} {room_id}！\n游戏：{get_game_name(game_type)}\n房主：{room.get('host_name', '未知')}\n\n当前玩家：\n{player_list}",
+                f"{join_message} {room_id}!\nGame: {get_game_name(game_type)}\nHost: {room.get('host_name', 'Unknown')}\n\nCurrent players:\n{player_list}",
                 reply_markup=player_markup
             )
             return
 
-    update.message.reply_text(f"找不到房间ID为 {room_id} 的游戏房间，请检查ID是否正确。")
-
+    update.message.reply_text(f"Could not find a game room with ID {room_id}. Please check if the ID is correct.")
 
 
 def list_rooms(update: Update, context: CallbackContext) -> None:
-    """处理 /rooms 命令，列出当前活跃房间"""
-    response = "当前活跃的游戏房间：\n\n"
+    """Handle /rooms command to list active rooms"""
+    response = "Current active game rooms:\n\n"
     found_rooms = False
 
     for game_type, rooms in active_rooms.items():
         if rooms:
-            response += f"【{get_game_name(game_type)}】\n"
+            response += f"[{get_game_name(game_type)}]\n"
             for room_id, room_data in rooms.items():
                 player_count = len(room_data["players"])
                 max_players = 8 if game_type == WHO_IS_SPY else 2
-                status = "等待中" if room_data["status"] == "waiting" else "游戏中"
-                response += f"- 房间ID: {room_id} | 玩家: {player_count}/{max_players} | 状态: {status}\n"
+                status = "Waiting" if room_data["status"] == "waiting" else "In Game"
+                response += f"- Room ID: {room_id} | Players: {player_count}/{max_players} | Status: {status}\n"
             response += "\n"
             found_rooms = True
 
     if not found_rooms:
-        response = "当前没有活跃的游戏房间。使用 /start 创建一个新房间！"
+        response = "There are no active game rooms. Use /start to create a new room!"
     
     update.message.reply_text(response)
 
+
 def cancel(update: Update, context: CallbackContext) -> int:
-    """取消并结束会话"""
-    update.message.reply_text("操作已取消，使用 /start 重新开始。")
+    """Cancel and end the session"""
+    update.message.reply_text("Operation canceled. Use /start to begin again.")
     return ConversationHandler.END
 
 
-
 def handle_record_command(update: Update, context: CallbackContext):
-    """处理用户查询输赢平记录的命令"""
+    """Handle user command to query win/loss/draw records"""
     user_id = update.effective_user.id
     try:
         message = get_user_record(user_id)
         update.message.reply_text(message)
     except Exception as e:
-        update.message.reply_text(f"查询记录失败：{e}")
+        update.message.reply_text(f"Failed to retrieve records: {e}")
 
 
 def main() -> None:
-    """启动机器人"""
+    """Start the bot"""
     updater = Updater(token=os.environ['GAMEBOT_TOKEN'])
     dispatcher = updater.dispatcher
 
-    # 修改 ConversationHandler，添加过滤规则，避免处理以特定前缀开头的回调数据
+    # modify ConversationHandler to add filters for callback data prefixes
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -564,16 +560,16 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("vote", start_vote))
     dispatcher.add_handler(CommandHandler("record", handle_record_command))
 
-    # 添加井字棋落子回调处理器
-    dispatcher.add_handler(CallbackQueryHandler(handle_ttt_move, pattern=r"^ttt_move_"))
-    # 添加21点游戏操作回调处理器
-    dispatcher.add_handler(CallbackQueryHandler(handle_blackjack_action, pattern=r"^bj_(hit|stand)_"))
-    # 添加围棋操作回调处理器
-    dispatcher.add_handler(CallbackQueryHandler(handle_go_move, pattern=r"^go_(move|pass)_"))
-    # 添加谁是卧底游戏操作回调处理器
-    dispatcher.add_handler(CallbackQueryHandler(handle_spy_discussion, pattern=r"^spy_discuss_"))
-    dispatcher.add_handler(CallbackQueryHandler(handle_spy_vote, pattern=r"^spy_vote_"))
+    # add callback handlers for specific games
+    dispatcher.add_handler(CallbackQueryHandler(handle_ttt_move, pattern=r"^ttt_move_"))  # Tic Tac Toe
+    dispatcher.add_handler(CallbackQueryHandler(handle_blackjack_action, pattern=r"^bj_(hit|stand)_"))  # Blackjack
+    dispatcher.add_handler(CallbackQueryHandler(handle_go_move, pattern=r"^go_(move|pass)_"))  # Go
+    dispatcher.add_handler(CallbackQueryHandler(handle_spy_discussion, pattern=r"^spy_discuss_"))  # Who is the Spy (discussion)
+    dispatcher.add_handler(CallbackQueryHandler(handle_spy_vote, pattern=r"^spy_vote_"))  # Who is the Spy (vote)
 
     updater.start_polling()
     updater.idle()
 
+
+# if __name__ == '__main__':
+#     main()

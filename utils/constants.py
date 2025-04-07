@@ -1,13 +1,15 @@
 import logging
 import os
 
-# 启用日志记录
+# logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
+
+# GPT
 class HKBU_ChatGPT:
     def submit(self, message):
         import requests
@@ -30,15 +32,16 @@ class HKBU_ChatGPT:
             return 'Error: ', response
 
 
-# 群组邀请链接
+# invite links
 GAME_GROUP = "https://t.me/+UCuqOkw1md9kZTRl"
 TRAVEL_GROUP = "https://t.me/+Hxk2dIl2qwI4Yzg1"
 
 
-# 游戏状态
+# game states
 SELECTING_GAME, GAME_ACTION = range(2)
 
-# 回调数据常量
+
+# callback data
 TIC_TAC_TOE = "tictactoe"
 GO = "go"
 WHO_IS_SPY = "whoisspy"
@@ -51,21 +54,25 @@ CANCEL_MATCH = "cancel_match"
 HIT = "hit"
 STAND = "stand"
 
-# 围棋相关常量
-GO_BOARD_SIZE = 7  # 使用7x7的小棋盘
-GO_PASS = "pass"  # 玩家选择跳过
 
-# 谁是卧底相关常量
-SPY_DISCUSS = "discuss"  # 讨论阶段
-SPY_VOTE = "vote"  # 投票阶段
-SPY_SKIP_DISCUSS = "skip_discuss"  # 跳过讨论直接投票
-SPY_NEXT_ROUND = "next_round"  # 进入下一轮游戏
+# go
+GO_BOARD_SIZE = 7  # 7X7 board
+GO_PASS = "pass"  # pass move
 
-# 纸牌花色和大小
+
+# spy
+SPY_DISCUSS = "discuss"
+SPY_VOTE = "vote"
+SPY_SKIP_DISCUSS = "skip_discuss"
+SPY_NEXT_ROUND = "next_round"
+
+
+# bj
 SUITS = ['♥', '♦', '♣', '♠']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
-# 活跃房间存储，每个游戏对应一个房间字典
+
+# active list for rooms
 active_rooms = {
     TIC_TAC_TOE: {},
     GO: {},
@@ -73,7 +80,8 @@ active_rooms = {
     BLACKJACK: {}
 }
 
-# 等待匹配的玩家列表
+
+# waiting list for players to join
 waiting_players = {
     TIC_TAC_TOE: [],
     GO: [],
@@ -81,12 +89,11 @@ waiting_players = {
     BLACKJACK: []
 }
 
-# 游戏名称映射
+
+# game names for display
 game_names = {
-    TIC_TAC_TOE: "井字棋",
-    GO: "围棋",
-    WHO_IS_SPY: "谁是卧底",
-    BLACKJACK: "21点"
+    TIC_TAC_TOE: "Tic Tac Toe",
+    GO: "Go",
+    WHO_IS_SPY: "Who is the Spy",
+    BLACKJACK: "Blackjack"
 }
-
-

@@ -1,113 +1,113 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 import random
-from utils.constants import *  # 导入常量
-from database import update_user_record  # 确保导入 update_user_record 函数
-
+from utils.constants import *
+from database import update_user_record
 
 def start_spy_game(update: Update, context: CallbackContext, room_id, room):
-    """初始化谁是卧底游戏，生成身份并分发给玩家"""
-    # 检查玩家数量，至少需要3人
+    """Initialize Who is the Spy game and assign roles"""
+    # check if there are at least 3 players
     if len(room["players"]) < 3:
         query = update.callback_query
         query.edit_message_text(
-            f"谁是卧底游戏至少需要3名玩家，当前只有{len(room['players'])}名玩家。\n请邀请更多玩家加入后再开始游戏。",
+            f"The game requires at least 3 players, but only {len(room['players'])} are present.\nPlease invite more players to join.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+                [InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]
             ])
         )
         return
     
-    # 设置游戏初始状态
+    # set initial game state
     room["status"] = "playing"
     room["round"] = 1
-    room["phase"] = "identity"  # 身份分配阶段
-    room["votes"] = {}  # 玩家投票记录
-    room["messages"] = []  # 玩家讨论记录
-    room["eliminated"] = []  # 被淘汰的玩家
+    room["phase"] = "identity"  # identity assignment phase
+    room["votes"] = {}  # player votes
+    room["messages"] = []  # discussion messages
+    room["eliminated"] = []  # eliminated players
     
-    # 随机选择一名玩家作为卧底
+    # randomly select a spy
     spy_idx = random.randrange(len(room["players"]))
     room["spy"] = room["players"][spy_idx]
     
-    # 使用GPT生成两个相关但不同的词语
+    # use GPT to generate two related but different words
     chatgpt = HKBU_ChatGPT()
-    prompt = "请生成两个相关但有细微差别的中文词语，用于'谁是卧底'游戏。格式为'普通玩家词语:卧底词语'，不要有其他任何解释。例如：'苹果:梨子'或'电影院:剧场'。"
+    prompt = "Generate two related but slightly different English words for the 'Who is the Spy' game. Format: 'Civilian word:Spy word'. No additional explanation. Example: 'Apple:Pear' or 'Cinema:Theater'."
     
     try:
         response = chatgpt.submit(prompt)
-        # 解析响应，获取两个词语
+        # parse response to get two words
         words = response.strip().split(":")
         if len(words) != 2:
-            # 如果格式不正确，使用默认词语
-            words = ["苹果", "梨子"]
+            # use default words if format is incorrect
+            words = ["Apple", "Pear"]
     except Exception as e:
-        logger.error(f"生成词语失败：{e}")
-        # 使用默认词语
-        words = ["苹果", "梨子"]
+        logger.error(f"Failed to generate words: {e}")
+        # use default words
+        words = ["Apple", "Pear"]
     
-    # 保存词语
+    # save words
     room["word_civilian"] = words[0]
     room["word_spy"] = words[1]
     
-    # 为每个玩家分配身份和词语
+    # assign roles and words to players
     for i, player_id in enumerate(room["players"]):
         if player_id == room["spy"]:
             room[f"word_{player_id}"] = room["word_spy"]
         else:
             room[f"word_{player_id}"] = room["word_civilian"]
     
-    # 通知所有玩家他们的身份和词语
+    # notify all players of their roles and words
     query = update.callback_query
     
-    # 构建玩家列表
-    player_list = "\n".join([f"{i+1}. {name}{' (房主)' if room['host'] == pid else ''}" 
+    # build player list
+    player_list = "\n".join([f"{i+1}. {name}{' (Host)' if room['host'] == pid else ''}" 
                         for i, (name, pid) in enumerate(zip(room["player_names"], room["players"]))])
     
-    # 通知所有玩家
+    # notify all players
     for player_id in room["players"]:
         word = room[f"word_{player_id}"]
         is_spy = player_id == room["spy"]
         
         message = (
-            f"谁是卧底游戏开始了！\n"
-            f"房间ID：{room_id}\n\n"
-            f"参与玩家：\n{player_list}\n\n"
-            f"你的身份是：{'卧底' if is_spy else '平民'}\n"
-            f"你拿到的词语是：{word}\n\n"
-            f"游戏规则：\n"
-            f"1. 每个人轮流描述自己拿到的词语，但不能直接说出词语本身\n"
-            f"2. 卧底的目标是隐藏自己，平民的目标是找出卧底\n"
-            f"3. 每轮讨论后，所有人投票选出一名怀疑的玩家\n"
-            f"4. 如果卧底被淘汰，平民胜利；如果最后只剩卧底和一名平民，卧底胜利"
+            f"The game 'Who is the Spy' has started!\n"
+            f"Room ID: {room_id}\n\n"
+            f"Players:\n{player_list}\n\n"
+            f"Your role: {'Spy' if is_spy else 'Civilian'}\n"
+            f"Your word: {word}\n\n"
+            f"Game rules:\n"
+            f"1. Each player describes their word without directly saying it.\n"
+            f"2. The spy's goal is to hide their identity, while civilians try to find the spy.\n"
+            f"3. After each round of discussion, everyone votes to eliminate a player.\n"
+            f"4. If the spy is eliminated, civilians win. If only the spy and one civilian remain, the spy wins."
         )
         
-        # 构建按钮
+        # build buttons
         keyboard = [
-            [InlineKeyboardButton("开始讨论", callback_data=f"spy_discuss_{room_id}")],
-            [InlineKeyboardButton("跳过讨论直接投票", callback_data=f"spy_vote_{room_id}")],
-            [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+            [InlineKeyboardButton("Start Discussion", callback_data=f"spy_discuss_{room_id}")],
+            [InlineKeyboardButton("Skip Discussion and Vote", callback_data=f"spy_vote_{room_id}")],
+            [InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         try:
             if player_id == update.effective_user.id:
-                # 更新当前消息
+                # update current message
                 query.edit_message_text(message, reply_markup=reply_markup)
             else:
-                # 发送新消息给其他玩家
+                # send new message to other players
                 context.bot.send_message(
                     chat_id=player_id,
                     text=message,
                     reply_markup=reply_markup
                 )
         except Exception as e:
-            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+            logger.error(f"Failed to send message to player {player_id}: {e}")
     
     return SELECTING_GAME
 
+
 def handle_spy_discussion(update: Update, context: CallbackContext) -> None:
-    """处理谁是卧底游戏中的讨论阶段"""
+    """Handle discussion phase in Who is the Spy game"""
     query = update.callback_query
     query.answer()
     data = query.data.split("_")
@@ -115,90 +115,93 @@ def handle_spy_discussion(update: Update, context: CallbackContext) -> None:
     if len(data) < 3:
         return
     
-    # 格式：spy_discuss_{room_id}
+    # format: spy_discuss_{room_id}
     action = data[1]
     room_id = data[2]
     
-    # 检查房间是否存在
+    # check if the room exists
     room = active_rooms[WHO_IS_SPY].get(room_id)
     if not room or room["status"] != "playing":
-        query.edit_message_text("该房间不存在或游戏已结束。", 
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]]))
+        query.edit_message_text(
+            "The room does not exist or the game has ended.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]])
+        )
         return
     
     user_id = update.effective_user.id
     username = update.effective_user.username or update.effective_user.first_name
     
-    # 检查用户是否在该房间
+    # check if the user is a valid player in the room
     if user_id not in room["players"] or user_id in room["eliminated"]:
-        query.answer("你不是该房间的有效玩家！", show_alert=True)
+        query.answer("You are not a valid player in this room!", show_alert=True)
         return
     
-    # 切换到讨论阶段
+    # switch to discussion phase
     room["phase"] = "discussion"
     
-    # 构建玩家列表（不包括已淘汰玩家）
+    # build a list of active players (excluding eliminated players)
     active_players = []
     for i, (name, pid) in enumerate(zip(room["player_names"], room["players"])):
         if pid not in room["eliminated"]:
             active_players.append((i, name, pid))
     
-    player_list = "\n".join([f"{i+1}. {name}{' (房主)' if room['host'] == pid else ''}" 
-                         for i, name, pid in active_players])
+    player_list = "\n".join([f"{i+1}. {name}{' (Host)' if room['host'] == pid else ''}" 
+                             for i, name, pid in active_players])
     
-    # 构建讨论消息
+    # build discussion message
     message = (
-        f"谁是卧底 - 讨论阶段\n"
-        f"房间ID：{room_id}，第{room['round']}轮\n\n"
-        f"存活玩家：\n{player_list}\n\n"
-        f"请使用 /say <内容> 命令发表你对词语的描述。\n"
-        f"例如：/say 这个东西是圆的，可以吃。\n\n"
-        f"所有玩家都可以随时使用 /vote 命令开始投票环节。"
+        f"Who is the Spy - Discussion Phase\n"
+        f"Room ID: {room_id}, Round {room['round']}\n\n"
+        f"Active players:\n{player_list}\n\n"
+        f"Use the /say <content> command to describe your word.\n"
+        f"Example: /say This thing is round and edible.\n\n"
+        f"Any player can use the /vote command to start the voting phase at any time."
     )
     
-    # 添加当前讨论记录
+    # add current discussion records
     if room["messages"]:
-        message += "\n\n当前讨论记录："
+        message += "\n\nCurrent discussion records:"
         for msg in room["messages"]:
             message += f"\n{msg['player']}: {msg['content']}"
     
-    # 构建按钮
+    # build buttons
     keyboard = [
-        [InlineKeyboardButton("开始投票", callback_data=f"spy_vote_{room_id}")],
-        [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+        [InlineKeyboardButton("Start Voting", callback_data=f"spy_vote_{room_id}")],
+        [InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # 通知所有在游戏中的玩家
+    # notify all players in the game
     for player_id in room["players"]:
         if player_id in room["eliminated"]:
             continue
             
         try:
             if player_id == user_id:
-                # 更新当前消息
+                # update the current message
                 query.edit_message_text(message, reply_markup=reply_markup)
             else:
-                # 发送新消息给其他玩家
+                # send a new message to other players
                 context.bot.send_message(
                     chat_id=player_id,
                     text=message,
                     reply_markup=reply_markup
                 )
         except Exception as e:
-            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+            logger.error(f"Failed to send message to player {player_id}: {e}")
+
 
 def say_message(update: Update, context: CallbackContext) -> None:
-    """处理 /say 命令，让玩家在谁是卧底游戏中发表描述"""
+    """Handle /say command for players to describe their word"""
     if not context.args:
-        update.message.reply_text("请提供你要说的内容，例如：/say 这个东西是圆的，可以吃。")
+        update.message.reply_text("Please provide your description, e.g., /say This thing is round and edible.")
         return
     
     user_id = update.effective_user.id
     username = update.effective_user.username or update.effective_user.first_name
     message_content = " ".join(context.args)
     
-    # 查找玩家所在的房间
+    # find the room the player is in
     player_room = None
     player_room_id = None
     
@@ -209,46 +212,46 @@ def say_message(update: Update, context: CallbackContext) -> None:
             break
     
     if not player_room:
-        update.message.reply_text("你当前不在任何谁是卧底游戏的讨论阶段中。")
+        update.message.reply_text("You are not in any discussion phase of a 'Who is the Spy' game.")
         return
     
-    # 记录玩家的发言
+    # record the player's message
     player_room["messages"].append({
         "player": username,
         "player_id": user_id,
         "content": message_content
     })
     
-    # 构建更新后的讨论消息
+    # build the updated discussion message
     active_players = []
     for i, (name, pid) in enumerate(zip(player_room["player_names"], player_room["players"])):
         if pid not in player_room["eliminated"]:
             active_players.append((i, name, pid))
     
-    player_list = "\n".join([f"{i+1}. {name}{' (房主)' if player_room['host'] == pid else ''}" 
+    player_list = "\n".join([f"{i+1}. {name}{' (Host)' if player_room['host'] == pid else ''}" 
                          for i, name, pid in active_players])
     
     message = (
-        f"谁是卧底 - 讨论阶段\n"
-        f"房间ID：{player_room_id}，第{player_room['round']}轮\n\n"
-        f"存活玩家：\n{player_list}\n\n"
-        f"请使用 /say <内容> 命令发表你对词语的描述。\n"
-        f"例如：/say 这个东西是圆的，可以吃。\n\n"
-        f"所有玩家都可以随时使用 /vote 命令开始投票环节。\n\n"
-        f"当前讨论记录："
+        f"Who is the Spy - Discussion Phase\n"
+        f"Room ID: {player_room_id}, Round {player_room['round']}\n\n"
+        f"Active players:\n{player_list}\n\n"
+        f"Use the /say <content> command to describe your word.\n"
+        f"Example: /say This thing is round and edible.\n\n"
+        f"Any player can use the /vote command to start the voting phase at any time.\n\n"
+        f"Current discussion records:"
     )
     
     for msg in player_room["messages"]:
         message += f"\n{msg['player']}: {msg['content']}"
     
-    # 构建按钮
+    # build buttons
     keyboard = [
-        [InlineKeyboardButton("开始投票", callback_data=f"spy_vote_{player_room_id}")],
-        [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+        [InlineKeyboardButton("Start Voting", callback_data=f"spy_vote_{player_room_id}")],
+        [InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # 通知所有在游戏中的玩家
+    # notify all players in the game
     for player_id in player_room["players"]:
         if player_id in player_room["eliminated"]:
             continue
@@ -260,13 +263,14 @@ def say_message(update: Update, context: CallbackContext) -> None:
                 reply_markup=reply_markup
             )
         except Exception as e:
-            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+            logger.error(f"Failed to send message to player {player_id}: {e}")
     
-    # 确认消息已发送
-    update.message.reply_text("你的描述已发送给所有玩家。")
+    # confirm the message has been sent
+    update.message.reply_text("Your description has been sent to all players.")
+
 
 def handle_spy_vote(update: Update, context: CallbackContext) -> None:
-    """处理谁是卧底游戏中的投票阶段"""
+    """Handle voting phase in Who is the Spy game"""
     query = update.callback_query
     query.answer()
     data = query.data.split("_")
@@ -274,42 +278,42 @@ def handle_spy_vote(update: Update, context: CallbackContext) -> None:
     if len(data) < 3:
         return
     
-    # 格式：spy_vote_{room_id} 或 spy_vote_{room_id}_{target_player_id}
+    # format: spy_vote_{room_id} or spy_vote_{room_id}_{target_player_id}
     action = data[1]  # vote
     room_id = data[2]
     target_player_id = data[3] if len(data) > 3 else None
     
-    # 检查房间是否存在
+    # check if the room exists
     room = active_rooms[WHO_IS_SPY].get(room_id)
     if not room or room["status"] != "playing":
-        query.edit_message_text("该房间不存在或游戏已结束。", 
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]]))
+        query.edit_message_text("The room does not exist or the game has ended.", 
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]]))
         return
     
     user_id = update.effective_user.id
     
-    # 检查用户是否在该房间
+    # check if the user is in the room
     if user_id not in room["players"] or user_id in room["eliminated"]:
-        query.answer("你不是该房间的有效玩家！", show_alert=True)
+        query.answer("You are not a valid player in this room!", show_alert=True)
         return
     
-    # 处理投票
+    # handle voting
     if target_player_id:
-        # 玩家选择了投票目标
-        target_player_id = int(target_player_id)  # 转换为整数，因为用户ID是整数
+        # player selected a target to vote for
+        target_player_id = int(target_player_id)
         
-        # 记录投票
+        # record the vote
         room["votes"][user_id] = target_player_id
         
-        # 检查是否所有玩家都已投票
+        # check if all players have voted
         active_players = [pid for pid in room["players"] if pid not in room["eliminated"]]
         all_voted = all(pid in room["votes"] for pid in active_players)
         
         if all_voted:
-            # 所有玩家都已投票，计算结果
+            # all players have voted, tally the results
             return tally_votes(update, context, room_id, room)
         else:
-            # 通知玩家投票已记录
+            # notify the player that their vote has been recorded
             player_name = ""
             for i, pid in enumerate(room["players"]):
                 if pid == target_player_id:
@@ -317,11 +321,11 @@ def handle_spy_vote(update: Update, context: CallbackContext) -> None:
                     break
                     
             query.edit_message_text(
-                f"你已投票给 {player_name}。\n等待其他玩家完成投票...",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]])
+                f"You have voted for {player_name}.\nWaiting for other players to finish voting...",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]])
             )
             
-            # 通知其他玩家有人完成投票
+            # notify other players that a vote has been cast
             voted_count = len(room["votes"])
             total_count = len(active_players)
             
@@ -332,40 +336,40 @@ def handle_spy_vote(update: Update, context: CallbackContext) -> None:
                 try:
                     context.bot.send_message(
                         chat_id=player_id,
-                        text=f"有玩家完成了投票！当前已有 {voted_count}/{total_count} 名玩家完成投票。"
+                        text=f"A player has voted! {voted_count}/{total_count} players have voted."
                     )
                 except Exception as e:
-                    logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+                    logger.error(f"Failed to send message to player {player_id}: {e}")
     else:
-        # 开始投票阶段
+        # start the voting phase
         room["phase"] = "voting"
-        room["votes"] = {}  # 清空之前的投票
+        room["votes"] = {}  # clear previous votes
         
-        # 构建存活玩家列表
+        # build a list of active players
         active_players = []
         for i, (name, pid) in enumerate(zip(room["player_names"], room["players"])):
-            if pid not in room["eliminated"] and pid != user_id:  # 不能投自己
+            if pid not in room["eliminated"] and pid != user_id:  # cannot vote for yourself
                 active_players.append((i, name, pid))
         
-        # 构建投票按钮
+        # build voting buttons
         keyboard = []
         for i, name, pid in active_players:
             keyboard.append([InlineKeyboardButton(name, callback_data=f"spy_vote_{room_id}_{pid}")])
         
-        keyboard.append([InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)])
+        keyboard.append([InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # 构建投票消息
+        # build voting message
         message = (
-            f"谁是卧底 - 投票阶段\n"
-            f"房间ID：{room_id}，第{room['round']}轮\n\n"
-            f"请选择你认为是卧底的玩家："
+            f"Who is the Spy - Voting Phase\n"
+            f"Room ID: {room_id}, Round {room['round']}\n\n"
+            f"Select the player you think is the spy:"
         )
         
-        # 更新当前消息
+        # update the current message
         query.edit_message_text(message, reply_markup=reply_markup)
         
-        # 通知其他玩家投票已开始
+        # notify other players that voting has started
         for player_id in room["players"]:
             if player_id in room["eliminated"] or player_id == user_id:
                 continue
@@ -373,22 +377,21 @@ def handle_spy_vote(update: Update, context: CallbackContext) -> None:
             try:
                 context.bot.send_message(
                     chat_id=player_id,
-                    text=f"投票阶段开始了！请选择你认为是卧底的玩家。",
+                    text="The voting phase has started! Select the player you think is the spy.",
                     reply_markup=reply_markup
                 )
             except Exception as e:
-                logger.error(f"无法发送消息给玩家 {player_id}：{e}")
-
+                logger.error(f"Failed to send message to player {player_id}: {e}")
 
 
 def tally_votes(update: Update, context: CallbackContext, room_id, room):
-    """计算投票结果，确定被淘汰的玩家"""
-    # 统计票数
+    """Tally votes and determine the eliminated player"""
+    # count votes
     vote_counts = {}
     for voter, candidate in room["votes"].items():
         vote_counts[candidate] = vote_counts.get(candidate, 0) + 1
     
-    # 找出得票最多的玩家
+    # find the player with the most votes
     max_votes = 0
     eliminated_players = []
     
@@ -399,132 +402,132 @@ def tally_votes(update: Update, context: CallbackContext, room_id, room):
         elif count == max_votes:
             eliminated_players.append(player_id)
     
-    # 如果有多人得票相同，随机选择一人
+    # if there's a tie, randomly select one player
     eliminated_player_id = random.choice(eliminated_players)
     room["eliminated"].append(eliminated_player_id)
     
-    # 获取被淘汰玩家的姓名
+    # get the name of the eliminated player
     eliminated_player_name = ""
     for i, pid in enumerate(room["players"]):
         if pid == eliminated_player_id:
             eliminated_player_name = room["player_names"][i]
             break
     
-    # 检查游戏是否结束
+    # check if the game is over
     game_over = False
     winner = None
     
-    # 统计剩余玩家
+    # count remaining players
     remaining_players = [pid for pid in room["players"] if pid not in room["eliminated"]]
     
-    # 检查是否只剩下两名玩家且其中一名是卧底
+    # check if only two players remain and one is the spy
     if len(remaining_players) == 2 and room["spy"] in remaining_players:
         game_over = True
-        winner = "spy"  # 卧底胜利
-    # 检查卧底是否被淘汰
+        winner = "spy"
+    # check if the spy has been eliminated
     elif eliminated_player_id == room["spy"]:
         game_over = True
-        winner = "civilians"  # 平民胜利
+        winner = "civilians"
     
-    # 构建投票结果消息
+    # build vote result message
     vote_result = []
     for i, (name, pid) in enumerate(zip(room["player_names"], room["players"])):
         if pid in vote_counts:
-            vote_result.append(f"{name}: {vote_counts[pid]}票")
+            vote_result.append(f"{name}: {vote_counts[pid]} votes")
     
-    # 构建消息
+    # build message
     if game_over:
-        # 游戏结束
         message = (
-            f"谁是卧底 - 游戏结束\n"
-            f"房间ID：{room_id}\n\n"
-            f"投票结果：\n{', '.join(vote_result)}\n\n"
-            f"{eliminated_player_name} 被淘汰了！\n\n"
+            f"Who is the Spy - Game Over\n"
+            f"Room ID: {room_id}\n\n"
+            f"Vote results:\n{', '.join(vote_result)}\n\n"
+            f"{eliminated_player_name} has been eliminated!\n\n"
         )
         
-        # 卧底身份揭晓
+        # reveal the spy
         spy_name = ""
         for i, pid in enumerate(room["players"]):
             if pid == room["spy"]:
                 spy_name = room["player_names"][i]
                 break
         
-        message += f"卧底是：{spy_name}\n"
-        message += f"平民词语：{room['word_civilian']}\n"
-        message += f"卧底词语：{room['word_spy']}\n\n"
+        message += f"The spy was: {spy_name}\n"
+        message += f"Civilian word: {room['word_civilian']}\n"
+        message += f"Spy word: {room['word_spy']}\n\n"
         
         if winner == "spy":
-            message += "卧底获胜！"
+            message += "The spy wins!"
         else:
-            message += "平民获胜！"
+            message += "The civilians win!"
         
         keyboard = [
-            [InlineKeyboardButton("开始新游戏", callback_data=f"start_game_{room_id}")],
-            [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+            [InlineKeyboardButton("Start New Game", callback_data=f"start_game_{room_id}")],
+            [InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]
         ]
         
-        # 更新房间状态
+        # update room status
         room["status"] = "finished"
 
-        # 调用 update_user_record 记录胜负
+        # record results in the database
         for i, player_id in enumerate(room["players"]):
             username = room["player_names"][i]
             if winner == "spy":
                 if player_id == room["spy"]:
-                    update_user_record(player_id, username, "WhoIsSpy", "win")  # 卧底胜利
+                    update_user_record(player_id, username, "WhoIsSpy", "win")
                 else:
-                    update_user_record(player_id, username, "WhoIsSpy", "loss")  # 平民失败
+                    update_user_record(player_id, username, "WhoIsSpy", "loss")
             elif winner == "civilians":
                 if player_id == room["spy"]:
-                    update_user_record(player_id, username, "WhoIsSpy", "loss")  # 卧底失败
+                    update_user_record(player_id, username, "WhoIsSpy", "loss")
                 else:
-                    update_user_record(player_id, username, "WhoIsSpy", "win")  # 平民胜利
+                    update_user_record(player_id, username, "WhoIsSpy", "win")
     else:
-        # 进入下一轮
+        # proceed to the next round
         room["round"] += 1
         room["phase"] = "discussion"
-        room["messages"] = []  # 清空讨论记录
+        room["messages"] = []  # clear discussion records
         
         message = (
-            f"谁是卧底 - 第{room['round']}轮\n"
-            f"房间ID：{room_id}\n\n"
-            f"投票结果：\n{', '.join(vote_result)}\n\n"
-            f"{eliminated_player_name} 被淘汰了！\n\n"
-            f"游戏继续，请开始新一轮的讨论。"
+            f"Who is the Spy - Round {room['round']}\n"
+            f"Room ID: {room_id}\n\n"
+            f"Vote results:\n{', '.join(vote_result)}\n\n"
+            f"{eliminated_player_name} has been eliminated!\n\n"
+            f"The game continues. Start a new round of discussion."
         )
         
         keyboard = [
-            [InlineKeyboardButton("开始讨论", callback_data=f"spy_discuss_{room_id}")],
-            [InlineKeyboardButton("跳过讨论直接投票", callback_data=f"spy_vote_{room_id}")],
-            [InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)]
+            [InlineKeyboardButton("Start Discussion", callback_data=f"spy_discuss_{room_id}")],
+            [InlineKeyboardButton("Skip Discussion and Vote", callback_data=f"spy_vote_{room_id}")],
+            [InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]
         ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # 通知所有玩家投票结果
+    # notify all players of the vote results
     for player_id in room["players"]:
         try:
             if player_id == update.effective_user.id:
-                # 更新当前消息
+                # update the current message
                 query = update.callback_query
                 query.edit_message_text(message, reply_markup=reply_markup)
             else:
-                # 发送新消息给其他玩家
+                # send a new message to other players
                 context.bot.send_message(
                     chat_id=player_id,
                     text=message,
                     reply_markup=reply_markup
                 )
         except Exception as e:
-            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+            logger.error(f"Failed to send message to player {player_id}: {e}")
     
     return SELECTING_GAME
 
+
 def start_vote(update: Update, context: CallbackContext) -> None:
-    """处理 /vote 命令，让玩家在谁是卧底游戏中直接开始投票"""
+    """Handle /vote command to start voting in Who is the Spy game"""
     user_id = update.effective_user.id
     
-    # 查找玩家所在的房间
+    # find the room the player is in
     player_room = None
     player_room_id = None
     
@@ -538,38 +541,38 @@ def start_vote(update: Update, context: CallbackContext) -> None:
             break
     
     if not player_room:
-        update.message.reply_text("你当前不在任何谁是卧底游戏的讨论阶段中，无法发起投票。")
+        update.message.reply_text("You are not in any discussion phase of a 'Who is the Spy' game.")
         return
     
-    # 切换到投票阶段
+    # switch to voting phase
     player_room["phase"] = "voting"
-    player_room["votes"] = {}  # 清空之前的投票
+    player_room["votes"] = {}  # clear previous votes
     
-    # 构建存活玩家列表（除了自己）
+    # build a list of active players (excluding the current player)
     active_players = []
     for i, (name, pid) in enumerate(zip(player_room["player_names"], player_room["players"])):
-        if pid not in player_room["eliminated"] and pid != user_id:  # 不能投自己
+        if pid not in player_room["eliminated"] and pid != user_id:  # cannot vote for yourself
             active_players.append((i, name, pid))
     
-    # 构建投票按钮
+    # build voting buttons
     keyboard = []
     for i, name, pid in active_players:
         keyboard.append([InlineKeyboardButton(name, callback_data=f"spy_vote_{player_room_id}_{pid}")])
     
-    keyboard.append([InlineKeyboardButton("返回主菜单", callback_data=BACK_TO_MAIN)])
+    keyboard.append([InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # 构建投票消息
+    # build voting message
     message = (
-        f"谁是卧底 - 投票阶段\n"
-        f"房间ID：{player_room_id}，第{player_room['round']}轮\n\n"
-        f"请选择你认为是卧底的玩家："
+        f"Who is the Spy - Voting Phase\n"
+        f"Room ID: {player_room_id}, Round {player_room['round']}\n\n"
+        f"Select the player you think is the spy:"
     )
     
-    # 发送投票消息给发起投票的玩家
+    # send voting message to the player who initiated the vote
     update.message.reply_text(message, reply_markup=reply_markup)
     
-    # 通知其他玩家投票已开始
+    # notify other players that voting has started
     for player_id in player_room["players"]:
         if player_id in player_room["eliminated"] or player_id == user_id:
             continue
@@ -577,8 +580,8 @@ def start_vote(update: Update, context: CallbackContext) -> None:
         try:
             context.bot.send_message(
                 chat_id=player_id,
-                text=f"玩家 {update.effective_user.username or update.effective_user.first_name} 发起了投票！请选择你认为是卧底的玩家。",
+                text=f"Player {update.effective_user.username or update.effective_user.first_name} has started voting! Select the player you think is the spy.",
                 reply_markup=reply_markup
             )
         except Exception as e:
-            logger.error(f"无法发送消息给玩家 {player_id}：{e}")
+            logger.error(f"Failed to send message to player {player_id}: {e}")

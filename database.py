@@ -10,6 +10,7 @@ try:
 except Exception as e:
     print(f"database connect fail: {e}")
 
+
 def update_user_record(user_id, username, game_name, result):
     """
     update or insert user game record.
@@ -66,26 +67,25 @@ def update_user_record(user_id, username, game_name, result):
             """, (user_id, username, game_name, wins, losses, draws))
 
         conn.commit()
-        print(f"用户 {username} 的记录已更新！")
+        print(f"Record for user {username} has been updated! ")
     except Exception as e:
-        print(f"更新记录失败: {e}")
+        print(f"Failed to update record: {e}")
     finally:
         conn.close()
 
+
 def get_user_record(user_id):
     """
-    查询用户的输赢平记录。
-    :param user_id: 用户 ID
-    :return: 用户的记录列表或消息字符串
+    Query the user's win/loss/draw records.
     """
     try:
         conn = pyodbc.connect(connection_string)
         cursor = conn.cursor()
 
-        # 确保 user_id 是字符串
+        # Ensure user_id is a string
         user_id = str(user_id)
 
-        # 查询用户记录
+        # Query user records
         cursor.execute("""
             SELECT username, game_name, wins, losses, draws FROM UserGameRecords
             WHERE user_id = ?
@@ -93,15 +93,15 @@ def get_user_record(user_id):
         records = cursor.fetchall()
 
         if records:
-            # 构造返回消息
-            message = f"用户 {records[0][0]} 的游戏记录：\n"  # 使用 username
+            # Construct return message
+            message = f"Game records for user {records[0][0]}:\n"
             for record in records:
-                username, game_name, wins, losses, draws = record
-                message += f"游戏: {game_name}\n胜: {wins}, 负: {losses}, 平: {draws}\n\n"
+                game_name, wins, losses, draws = record
+                message += f"Game: {game_name}\nWins: {wins}, Losses: {losses}, Draws: {draws}\n\n"
             return message
         else:
-            return f"用户 {user_id} 没有记录。"
+            return f"No records found for user {user_id}."
     except Exception as e:
-        return f"查询记录失败：{e}"
+        return f"Failed to query records: {e}"
     finally:
         conn.close()
