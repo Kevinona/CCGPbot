@@ -159,6 +159,8 @@ def handle_go_move(update: Update, context: CallbackContext) -> None:
             # notify all players the game has ended
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]])
             for pid in room["players"]:
+                if pid == "GPT":
+                    continue
                 try:
                     context.bot.send_message(
                         chat_id=pid,
@@ -358,6 +360,8 @@ Please choose one move or explicitly state "pass". Reply with a single valid coo
                 # notify all players the game has ended
                 reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]])
                 for pid in room["players"]:
+                    if pid == 'GPT':
+                        continue
                     try:
                         context.bot.send_message(
                             chat_id=pid,
@@ -504,6 +508,8 @@ def _make_fallback_go_move(context, room_id, room):
             # notify all players the game has ended
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Return to Main Menu", callback_data=BACK_TO_MAIN)]])
             for pid in room["players"]:
+                if pid == "GPT":
+                    continue
                 try:
                     context.bot.send_message(
                         chat_id=pid,

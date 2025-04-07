@@ -148,11 +148,11 @@ def handle_ttt_move(update: Update, context: CallbackContext) -> None:
     try:
         query.edit_message_text(text, reply_markup=reply_markup)
     except Exception as e:
-        logger.error(f"编辑消息失败：{e}")
+        logger.error(f"Failed to edit the message: {e}")
     
     # notify other players in the room to update the board state
     for pid in room["players"]:
-        if pid == user_id:
+        if pid == user_id or pid == "GPT":
             continue
         try:
             context.bot.send_message(
@@ -245,7 +245,7 @@ def make_gpt_ttt_move(context, room_id, room):
         update_user_record(room["host"], room["player_names"][0], TIC_TAC_TOE, "loss")
         update_user_record("GPT", "GPT AI", TIC_TAC_TOE, "win")
     elif result == "draw":
-        text = f"平局！\n房间ID：{room_id}\n最终棋盘："
+        text = f"A draw! \nRoom ID: {room_id}\nFinal chessboard:"
         room["status"] = "finished"
 
         # update database records

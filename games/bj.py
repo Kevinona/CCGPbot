@@ -96,13 +96,8 @@ def start_blackjack_game(update: Update, context: CallbackContext, room_id, room
     
     # send game state to other players
     for i, player_id in enumerate(room["players"]):
-        if player_id == room["host"]:
+        if player_id == room["host"] or player_id == "GPT":
             continue
-        
-        # skip GPT players for now
-        if player_id == "GPT":
-            continue
-        
         try:
             player_reply_markup = generate_blackjack_keyboard(room_id, player_id, room)
             context.bot.send_message(
