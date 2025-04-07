@@ -5,6 +5,7 @@ CCGPbot is a multi-functional Telegram bot that provides the following features:
 - **Travel Assistant**: Offers travel plans, guides, and attraction recommendations by GPT.
 - **Game Bot**: Provide Tic Tac Toe, Go, Who is the Spy, and Blackjack.
 - **Group Management**: Provides quick access to join travel and game groups.
+
 The bot is deployed on the Azure cloud platform, utilizing Azure SQL Database for data storage and HKBU GPT for GPT connect.
 
 ## Features
